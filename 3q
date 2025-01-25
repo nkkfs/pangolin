@@ -1,0 +1,11 @@
+Add migration
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch tcp-udp-traffic
+# Your branch is up to date with 'origin/tcp-udp-traffic'.
+#
+# Changes to be committed:
+#	modified:   server/setup/migrations.ts
+#	new file:   server/setup/scripts/1.0.0-beta10.ts
+#

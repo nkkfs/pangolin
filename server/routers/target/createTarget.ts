@@ -55,6 +55,7 @@ const createTargetSchema = z
         ip: domainSchema,
         method: z.string().min(1).max(10),
         port: z.number().int().min(1).max(65535),
+        proxyPort: z.number().int().min(1).max(65535).optional(),
         protocol: z.string().optional(),
         enabled: z.boolean().default(true)
     })
@@ -130,7 +131,7 @@ export async function createTarget(
                 .insert(targets)
                 .values({
                     resourceId,
-                    protocol: "tcp", // hard code for now
+                    protocol: "tcp", // tcp by default but if its in the targetData, it will be overwritten
                     ...targetData
                 })
                 .returning();
@@ -163,7 +164,7 @@ export async function createTarget(
                 .insert(targets)
                 .values({
                     resourceId,
-                    protocol: "tcp", // hard code for now
+                    protocol: "tcp", // tcp by default but if its in the targetData, it will be overwritten
                     internalPort,
                     ...targetData
                 })
