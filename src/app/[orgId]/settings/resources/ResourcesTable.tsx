@@ -39,6 +39,9 @@ export type ResourceRow = {
     site: string;
     siteId: string;
     hasAuth: boolean;
+    http: boolean;
+    protocol: string;
+    proxyPort: number | null;
 };
 
 type ResourcesTableProps = {
@@ -158,12 +161,28 @@ export default function SitesTable({ resources, orgId }: ResourcesTableProps) {
             }
         },
         {
-            accessorKey: "domain",
-            header: "Full URL",
+            accessorKey: "protocol",
+            header: "Protocol",
             cell: ({ row }) => {
                 const resourceRow = row.original;
                 return (
+                    <span>{resourceRow.protocol.toUpperCase()}</span>
+                );
+            }
+        },
+        {
+            accessorKey: "domain",
+            header: "Access",
+            cell: ({ row }) => {
+                const resourceRow = row.original;
+                return (
+                    <div>
+                    {!resourceRow.http ? (
+                                            <CopyToClipboard text={resourceRow.proxyPort!.toString()} isLink={false} />
+                    ) : (
                     <CopyToClipboard text={resourceRow.domain} isLink={true} />
+                    )}
+                    </div>
                 );
             }
         },
@@ -186,17 +205,23 @@ export default function SitesTable({ resources, orgId }: ResourcesTableProps) {
                 const resourceRow = row.original;
                 return (
                     <div>
-                        {resourceRow.hasAuth ? (
-                            <span className="text-green-500 flex items-center space-x-2">
-                                <ShieldCheck className="w-4 h-4" />
-                                <span>Protected</span>
-                            </span>
-                        ) : (
-                            <span className="text-yellow-500 flex items-center space-x-2">
-                                <ShieldOff className="w-4 h-4" />
-                                <span>Not Protected</span>
-                            </span>
-                        )}
+                        
+
+                        {!resourceRow.http ? (
+                            <span>--</span>
+                        ) : 
+                            resourceRow.hasAuth ? (
+                                <span className="text-green-500 flex items-center space-x-2">
+                                    <ShieldCheck className="w-4 h-4" />
+                                    <span>Protected</span>
+                                </span>
+                            ) : (
+                                <span className="text-yellow-500 flex items-center space-x-2">
+                                    <ShieldOff className="w-4 h-4" />
+                                    <span>Not Protected</span>
+                                </span>
+                            )
+                        }
                     </div>
                 );
             }

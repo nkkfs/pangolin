@@ -53,6 +53,9 @@ export default async function ResourcesPage(props: ResourcesPageProps) {
             domain: `${resource.ssl ? "https://" : "http://"}${resource.fullDomain}`,
             site: resource.siteName || "None",
             siteId: resource.siteId || "Unknown",
+            protocol: resource.protocol,
+            proxyPort: resource.proxyPort,
+            http: resource.http,
             hasAuth:
                 resource.sso ||
                 resource.pincodeId !== null ||

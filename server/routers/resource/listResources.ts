@@ -63,7 +63,10 @@ function queryResources(
                 passwordId: resourcePassword.passwordId,
                 pincodeId: resourcePincode.pincodeId,
                 sso: resources.sso,
-                whitelist: resources.emailWhitelistEnabled
+                whitelist: resources.emailWhitelistEnabled,
+                http: resources.http,
+                protocol: resources.protocol,
+                proxyPort: resources.proxyPort
             })
             .from(resources)
             .leftJoin(sites, eq(resources.siteId, sites.siteId))
@@ -93,7 +96,10 @@ function queryResources(
                 passwordId: resourcePassword.passwordId,
                 sso: resources.sso,
                 pincodeId: resourcePincode.pincodeId,
-                whitelist: resources.emailWhitelistEnabled
+                whitelist: resources.emailWhitelistEnabled,
+                http: resources.http,
+                protocol: resources.protocol,
+                proxyPort: resources.proxyPort
             })
             .from(resources)
             .leftJoin(sites, eq(resources.siteId, sites.siteId))
