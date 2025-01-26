@@ -41,14 +41,15 @@ export const resources = sqliteTable("resources", {
         })
         .notNull(),
     name: text("name").notNull(),
-    subdomain: text("subdomain").notNull(),
-    fullDomain: text("fullDomain").notNull().unique(),
+    subdomain: text("subdomain"),
+    fullDomain: text("fullDomain").unique(),
     ssl: integer("ssl", { mode: "boolean" }).notNull().default(false),
     blockAccess: integer("blockAccess", { mode: "boolean" })
         .notNull()
         .default(false),
     sso: integer("sso", { mode: "boolean" }).notNull().default(true),
     http: integer("http", { mode: "boolean" }).notNull().default(true),
+    protocol: text("protocol").notNull(),
     proxyPort: integer("proxyPort"),
     emailWhitelistEnabled: integer("emailWhitelistEnabled", { mode: "boolean" })
         .notNull()
@@ -66,7 +67,6 @@ export const targets = sqliteTable("targets", {
     method: text("method").notNull(),
     port: integer("port").notNull(),
     internalPort: integer("internalPort"),
-    protocol: text("protocol"),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true)
 });
 

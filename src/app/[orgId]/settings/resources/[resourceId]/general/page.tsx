@@ -13,22 +13,7 @@ import {
     FormLabel,
     FormMessage
 } from "@/components/ui/form";
-import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
 import { Input } from "@/components/ui/input";
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList
-} from "@/components/ui/command";
-
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger
-} from "@/components/ui/popover";
 import { useResourceContext } from "@app/hooks/useResourceContext";
 import { ListSitesResponse } from "@server/routers/site";
 import { useEffect, useState } from "react";
@@ -49,7 +34,6 @@ import {
 } from "@app/components/Settings";
 import { useOrgContext } from "@app/hooks/useOrgContext";
 import CustomDomainInput from "../CustomDomainInput";
-import ResourceInfoBox from "../ResourceInfoBox";
 import { subdomainSchema } from "@server/schemas/subdomainSchema";
 import { createApiClient } from "@app/lib/api";
 import { useEnvContext } from "@app/hooks/useEnvContext";
@@ -81,7 +65,7 @@ export default function GeneralForm() {
         resolver: zodResolver(GeneralFormSchema),
         defaultValues: {
             name: resource.name,
-            subdomain: resource.subdomain
+            subdomain: resource.subdomain ? resource.subdomain : undefined,
             // siteId: resource.siteId!,
         },
         mode: "onChange"
@@ -177,7 +161,7 @@ export default function GeneralForm() {
                                             <FormLabel>Subdomain</FormLabel>
                                             <FormControl>
                                                 <CustomDomainInput
-                                                    value={field.value}
+                                                    value={field.value || ""}
                                                     domainSuffix={domainSuffix}
                                                     placeholder="Enter subdomain"
                                                     onChange={(value) =>

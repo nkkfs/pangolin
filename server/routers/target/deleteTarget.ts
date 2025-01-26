@@ -50,9 +50,7 @@ export async function deleteTarget(
         }
         // get the resource
         const [resource] = await db
-            .select({
-                siteId: resources.siteId
-            })
+            .select()
             .from(resources)
             .where(eq(resources.resourceId, deletedTarget.resourceId!));
 
@@ -110,7 +108,7 @@ export async function deleteTarget(
                     .where(eq(newts.siteId, site.siteId))
                     .limit(1);
 
-                removeTargets(newt.newtId, [deletedTarget]);
+                removeTargets(newt.newtId, [deletedTarget], resource.protocol);
             }
         }
 

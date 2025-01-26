@@ -40,7 +40,6 @@ function queryTargets(resourceId: number) {
             ip: targets.ip,
             method: targets.method,
             port: targets.port,
-            protocol: targets.protocol,
             enabled: targets.enabled,
             resourceId: targets.resourceId
             // resourceName: resources.name,

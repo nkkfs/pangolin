@@ -103,7 +103,7 @@ export async function deleteResource(
                     .where(eq(newts.siteId, site.siteId))
                     .limit(1);
 
-                removeTargets(newt.newtId, targetsToBeRemoved);
+                removeTargets(newt.newtId, targetsToBeRemoved, deletedResource.protocol);
             }
         }
 

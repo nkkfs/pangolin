@@ -55,7 +55,6 @@ const createTargetSchema = z
         ip: domainSchema,
         method: z.string().min(1).max(10),
         port: z.number().int().min(1).max(65535),
-        protocol: z.string().optional(),
         enabled: z.boolean().default(true)
     })
     .strict();
@@ -94,9 +93,7 @@ export async function createTarget(
 
         // get the resource
         const [resource] = await db
-            .select({
-                siteId: resources.siteId
-            })
+            .select()
             .from(resources)
             .where(eq(resources.resourceId, resourceId));
 
@@ -130,7 +127,6 @@ export async function createTarget(
                 .insert(targets)
                 .values({
                     resourceId,
-                    protocol: "tcp", // tcp by default but if its in the targetData, it will be overwritten
                     ...targetData
                 })
                 .returning();
@@ -163,7 +159,6 @@ export async function createTarget(
                 .insert(targets)
                 .values({
                     resourceId,
-                    protocol: "tcp", // tcp by default but if its in the targetData, it will be overwritten
                     internalPort,
                     ...targetData
                 })
@@ -186,7 +181,7 @@ export async function createTarget(
                         .where(eq(newts.siteId, site.siteId))
                         .limit(1);
 
-                    addTargets(newt.newtId, newTarget);
+                    addTargets(newt.newtId, newTarget, resource.protocol);
                 }
             }
         }
