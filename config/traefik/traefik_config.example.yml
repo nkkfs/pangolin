@@ -35,7 +35,7 @@ entryPoints:
     address: ":443"
     transport:
       respondingTimeouts:
-        readTimeout: 30m
+        readTimeout: "30m"
     http:
       tls:
         certResolver: "letsencrypt"
