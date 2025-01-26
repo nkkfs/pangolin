@@ -150,7 +150,6 @@ export async function traefikConfigProvider(
                         : {})
                 };
 
-<<<<<<< HEAD
                 config_output.http.routers![routerName] = {
                     entryPoints: [
                         resource.ssl
@@ -158,24 +157,6 @@ export async function traefikConfigProvider(
                             : config.getRawConfig().traefik.http_entrypoint
                     ],
                     middlewares: [badgerMiddlewareName],
-=======
-            http.routers![routerName] = {
-                entryPoints: [
-                    resource.ssl
-                        ? config.getRawConfig().traefik.https_entrypoint
-                        : config.getRawConfig().traefik.http_entrypoint,
-                ],
-                middlewares: [badgerMiddlewareName],
-                service: serviceName,
-                rule: `Host(\`${fullDomain}\`)`,
-                ...(resource.ssl ? { tls } : {}),
-            };
-
-            if (resource.ssl) {
-                http.routers![routerName + "-redirect"] = {
-                    entryPoints: [config.getRawConfig().traefik.http_entrypoint],
-                    middlewares: [redirectHttpsMiddlewareName],
->>>>>>> dev
                     service: serviceName,
                     rule: `Host(\`${fullDomain}\`)`,
                     ...(resource.ssl ? { tls } : {})
@@ -187,7 +168,7 @@ export async function traefikConfigProvider(
                         entryPoints: [
                             config.getRawConfig().traefik.http_entrypoint
                         ],
-                        middlewares: [redirectMiddlewareName],
+                        middlewares: [redirectHttpsMiddlewareName],
                         service: serviceName,
                         rule: `Host(\`${fullDomain}\`)`
                     };
