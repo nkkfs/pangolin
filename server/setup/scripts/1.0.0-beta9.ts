@@ -20,20 +20,16 @@ export default async function migration() {
 
     try {
         await db.transaction(async (trx) => {
-            await db.transaction(async (trx) => {
-                trx.run(sql`UPDATE ${users} SET email = LOWER(email);`);
-                trx.run(
-                    sql`UPDATE ${emailVerificationCodes} SET email = LOWER(email);`
-                );
-                trx.run(
-                    sql`UPDATE ${passwordResetTokens} SET email = LOWER(email);`
-                );
-                trx.run(sql`UPDATE ${userInvites} SET email = LOWER(email);`);
-                trx.run(
-                    sql`UPDATE ${resourceWhitelist} SET email = LOWER(email);`
-                );
-                trx.run(sql`UPDATE ${resourceOtp} SET email = LOWER(email);`);
-            });
+            trx.run(sql`UPDATE ${users} SET email = LOWER(email);`);
+            trx.run(
+                sql`UPDATE ${emailVerificationCodes} SET email = LOWER(email);`
+            );
+            trx.run(
+                sql`UPDATE ${passwordResetTokens} SET email = LOWER(email);`
+            );
+            trx.run(sql`UPDATE ${userInvites} SET email = LOWER(email);`);
+            trx.run(sql`UPDATE ${resourceWhitelist} SET email = LOWER(email);`);
+            trx.run(sql`UPDATE ${resourceOtp} SET email = LOWER(email);`);
         });
     } catch (error) {
         console.log(
