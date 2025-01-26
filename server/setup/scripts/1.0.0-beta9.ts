@@ -33,14 +33,14 @@ export default async function migration() {
         });
     } catch (error) {
         console.log(
-            "We were unable to make all emails lower case in the database."
+            "We were unable to make all emails lower case in the database. You can safely ignore this error."
         );
         console.error(error);
     }
 
     try {
         await db.transaction(async (trx) => {
-            trx.run(sql`PRAGMA foreign_keys=OFF;`)
+            trx.run(sql`PRAGMA foreign_keys=OFF;`);
             trx.run(sql`CREATE TABLE __new_resources (
                 resourceId integer PRIMARY KEY AUTOINCREMENT NOT NULL,
                 siteId integer NOT NULL,
@@ -57,11 +57,13 @@ export default async function migration() {
                 emailWhitelistEnabled integer DEFAULT false NOT NULL,
                 FOREIGN KEY (siteId) REFERENCES sites(siteId) ON UPDATE no action ON DELETE cascade,
                 FOREIGN KEY (orgId) REFERENCES orgs(orgId) ON UPDATE no action ON DELETE cascade
-            );`)
-            trx.run(sql`INSERT INTO __new_resources("resourceId", "siteId", "orgId", "name", "subdomain", "fullDomain", "ssl", "blockAccess", "sso", "http", "protocol", "proxyPort", "emailWhitelistEnabled") SELECT "resourceId", "siteId", "orgId", "name", "subdomain", "fullDomain", "ssl", "blockAccess", "sso", "http", "protocol", "proxyPort", "emailWhitelistEnabled" FROM resources;`)
-            trx.run(sql`DROP TABLE resources;`)
-            trx.run(sql`ALTER TABLE __new_resources RENAME TO resources;`)
-            trx.run(sql`PRAGMA foreign_keys=ON;`)
+            );`);
+            trx.run(
+                sql`INSERT INTO __new_resources("resourceId", "siteId", "orgId", "name", "subdomain", "fullDomain", "ssl", "blockAccess", "sso", "http", "protocol", "proxyPort", "emailWhitelistEnabled") SELECT "resourceId", "siteId", "orgId", "name", "subdomain", "fullDomain", "ssl", "blockAccess", "sso", "http", "protocol", "proxyPort", "emailWhitelistEnabled" FROM resources;`
+            );
+            trx.run(sql`DROP TABLE resources;`);
+            trx.run(sql`ALTER TABLE __new_resources RENAME TO resources;`);
+            trx.run(sql`PRAGMA foreign_keys=ON;`);
             trx.run(sql`CREATE TABLE __new_targets (
                 targetId integer PRIMARY KEY AUTOINCREMENT NOT NULL,
                 resourceId integer NOT NULL,
@@ -71,16 +73,18 @@ export default async function migration() {
                 internalPort integer,
                 enabled integer DEFAULT true NOT NULL,
                 FOREIGN KEY (resourceId) REFERENCES resources(resourceId) ON UPDATE no action ON DELETE cascade
-            );`)
-            trx.run(sql`INSERT INTO __new_targets("targetId", "resourceId", "ip", "method", "port", "internalPort", "enabled") SELECT "targetId", "resourceId", "ip", "method", "port", "internalPort", "enabled" FROM targets;`)
-            trx.run(sql`DROP TABLE targets;`)
-            trx.run(sql`ALTER TABLE __new_targets RENAME TO targets;`)
+            );`);
+            trx.run(
+                sql`INSERT INTO __new_targets("targetId", "resourceId", "ip", "method", "port", "internalPort", "enabled") SELECT "targetId", "resourceId", "ip", "method", "port", "internalPort", "enabled" FROM targets;`
+            );
+            trx.run(sql`DROP TABLE targets;`);
+            trx.run(sql`ALTER TABLE __new_targets RENAME TO targets;`);
         });
     } catch (error) {
         console.log(
             "We were unable to make the changes to the targets and resources tables."
         );
-        console.error(error);
+        throw error;
     }
 
     try {
@@ -126,14 +130,6 @@ export default async function migration() {
             "traefik_config.yml"
         );
 
-
-        // read the traefik file
-        // look for the websecure:
-        // add
-        // transport:
-        //     respondingTimeouts:
-        //         readTimeout: 30m
-
         // Define schema for traefik config validation
         const schema = z.object({
             entryPoints: z
@@ -152,15 +148,15 @@ export default async function migration() {
                         .optional()
                 })
                 .optional(),
-                experimental: z.object({
-                    plugins: z.object({
-                        badger: z.object({
-                            moduleName: z.string(),
-                            version: z.string()
-                        })
+            experimental: z.object({
+                plugins: z.object({
+                    badger: z.object({
+                        moduleName: z.string(),
+                        version: z.string()
                     })
                 })
-            });
+            })
+        });
 
         const traefikFileContents = fs.readFileSync(traefikPath, "utf8");
         const traefikConfig = yaml.load(traefikFileContents) as any;
@@ -172,21 +168,14 @@ export default async function migration() {
         }
 
         // Ensure websecure entrypoint exists
-        if (!traefikConfig.entryPoints) {
-            traefikConfig.entryPoints = {};
-        }
-        if (!traefikConfig.entryPoints.websecure) {
-            traefikConfig.entryPoints.websecure = {
-                address: ":443"
+        if (traefikConfig.entryPoints?.websecure) {
+            // Add transport configuration
+            traefikConfig.entryPoints.websecure.transport = {
+                respondingTimeouts: {
+                    readTimeout: "30m"
+                }
             };
         }
-
-        // Add transport configuration
-        traefikConfig.entryPoints.websecure.transport = {
-            respondingTimeouts: {
-                readTimeout: "30m"
-            }
-        };
 
         traefikConfig.experimental.plugins.badger.version = "v1.0.0-beta.3";
 
@@ -198,15 +187,19 @@ export default async function migration() {
         );
     } catch (e) {
         console.log(
-            "We were unable to update the version of Badger in your Traefik configuration. Please update it manually."
+            "We were unable to update the version of Badger in your Traefik configuration. Please update it manually to at least v1.0.0-beta.3. https://github.com/fosrl/badger"
         );
-        console.error(e);
+        throw e;
     }
 
     try {
         await db.transaction(async (trx) => {
-            trx.run(sql`ALTER TABLE 'resourceSessions' ADD 'isRequestToken' integer;`);
-            trx.run(sql`ALTER TABLE 'resourceSessions' ADD 'userSessionId' text REFERENCES session(id);`);
+            trx.run(
+                sql`ALTER TABLE 'resourceSessions' ADD 'isRequestToken' integer;`
+            );
+            trx.run(
+                sql`ALTER TABLE 'resourceSessions' ADD 'userSessionId' text REFERENCES session(id);`
+            );
         });
     } catch (e) {
         console.log(

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import db from "@server/db";
 import * as schema from "@server/db/schema";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import logger from "@server/logger";
 import HttpCode from "@server/types/HttpCode";
 import config from "@server/lib/config";
@@ -82,19 +82,23 @@ export async function traefikConfigProvider(
                             [badgerMiddlewareName]: {
                                 apiBaseUrl: new URL(
                                     "/api/v1",
-                                    `http://${config.getRawConfig().server.internal_hostname}:${config.getRawConfig().server.internal_port}`,
+                                    `http://${config.getRawConfig().server.internal_hostname}:${config.getRawConfig().server.internal_port}`
                                 ).href,
                                 userSessionCookieName:
-                                    config.getRawConfig().server.session_cookie_name,
-                                accessTokenQueryParam: config.getRawConfig().server.resource_access_token_param,
-                                resourceSessionRequestParam: config.getRawConfig().server.resource_session_request_param
-                            },
+                                    config.getRawConfig().server
+                                        .session_cookie_name,
+                                accessTokenQueryParam:
+                                    config.getRawConfig().server
+                                        .resource_access_token_param,
+                                resourceSessionRequestParam:
+                                    config.getRawConfig().server
+                                        .resource_session_request_param
+                            }
                         }
                     },
                     [redirectHttpsMiddlewareName]: {
                         redirectScheme: {
                             scheme: "https",
-                            permanent: true
                         }
                     }
                 }
@@ -111,7 +115,7 @@ export async function traefikConfigProvider(
 
         for (const resource of allResources) {
             const targets = JSON.parse(resource.targets);
-            
+
             const site = resource.site;
             const org = resource.org;
 
