@@ -26,6 +26,7 @@ const updateResourceBodySchema = z
         ssl: z.boolean().optional(),
         sso: z.boolean().optional(),
         blockAccess: z.boolean().optional(),
+        proxyPort: z.number().int().min(1).max(65535).optional(),
         emailWhitelistEnabled: z.boolean().optional()
         // siteId: z.number(),
     })

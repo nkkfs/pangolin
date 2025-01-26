@@ -55,7 +55,6 @@ const createTargetSchema = z
         ip: domainSchema,
         method: z.string().min(1).max(10),
         port: z.number().int().min(1).max(65535),
-        proxyPort: z.number().int().min(1).max(65535).optional(),
         protocol: z.string().optional(),
         enabled: z.boolean().default(true)
     })

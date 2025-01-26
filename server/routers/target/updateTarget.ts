@@ -51,7 +51,6 @@ const updateTargetBodySchema = z
         ip: domainSchema.optional(),
         method: z.string().min(1).max(10).optional(),
         port: z.number().int().min(1).max(65535).optional(),
-        proxyPort: z.number().int().min(1).max(65535).optional(),
         enabled: z.boolean().optional()
     })
     .strict()

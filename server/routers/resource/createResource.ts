@@ -29,7 +29,8 @@ const createResourceParamsSchema = z
 const createResourceSchema = z
     .object({
         name: z.string().min(1).max(255),
-        subdomain: subdomainSchema
+        subdomain: subdomainSchema,
+        proxyPort: z.number().int().min(1).max(65535).optional(),
     })
     .strict();
 
