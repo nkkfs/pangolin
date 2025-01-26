@@ -90,13 +90,16 @@ export default async function ResourceLayout(props: ResourceLayoutProps) {
             title: "Connectivity",
             href: `/{orgId}/settings/resources/{resourceId}/connectivity`
             // icon: <Cloud className="w-4 h-4" />,
-        },
-        {
+        }
+    ];
+
+    if (resource.http) {
+        sidebarNavItems.push({
             title: "Authentication",
             href: `/{orgId}/settings/resources/{resourceId}/authentication`
             // icon: <Shield className="w-4 h-4" />,
-        }
-    ];
+        });
+    }
 
     return (
         <>

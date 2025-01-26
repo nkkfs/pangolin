@@ -53,7 +53,7 @@ const createTargetParamsSchema = z
 const createTargetSchema = z
     .object({
         ip: domainSchema,
-        method: z.string().min(1).max(10),
+        method: z.string().optional().nullable(),
         port: z.number().int().min(1).max(65535),
         enabled: z.boolean().default(true)
     })

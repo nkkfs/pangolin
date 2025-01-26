@@ -42,7 +42,7 @@ export const resources = sqliteTable("resources", {
         .notNull(),
     name: text("name").notNull(),
     subdomain: text("subdomain"),
-    fullDomain: text("fullDomain").unique(),
+    fullDomain: text("fullDomain"),
     ssl: integer("ssl", { mode: "boolean" }).notNull().default(false),
     blockAccess: integer("blockAccess", { mode: "boolean" })
         .notNull()
@@ -64,7 +64,7 @@ export const targets = sqliteTable("targets", {
         })
         .notNull(),
     ip: text("ip").notNull(),
-    method: text("method").notNull(),
+    method: text("method"),
     port: integer("port").notNull(),
     internalPort: integer("internalPort"),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true)

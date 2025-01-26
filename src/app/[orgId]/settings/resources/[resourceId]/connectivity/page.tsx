@@ -94,7 +94,7 @@ const domainSchema = z
 
 const addTargetSchema = z.object({
     ip: domainSchema,
-    method: z.string(),
+    method: z.string().nullable(),
     port: z.coerce.number().int().positive()
     // protocol: z.string(),
 });
@@ -129,9 +129,9 @@ export default function ReverseProxyTargets(props: {
     const addTargetForm = useForm({
         resolver: zodResolver(addTargetSchema),
         defaultValues: {
-            ip: "",
-            method: "http",
-            port: 80
+            ip: "localhost",
+            method: resource.http ? "http" : null,
+            port: resource.http ? 80 : resource.proxyPort || 1234
             // protocol: "TCP",
         }
     });
@@ -331,26 +331,6 @@ export default function ReverseProxyTargets(props: {
 
     const columns: ColumnDef<LocalTarget>[] = [
         {
-            accessorKey: "method",
-            header: "Method",
-            cell: ({ row }) => (
-                <Select
-                    defaultValue={row.original.method}
-                    onValueChange={(value) =>
-                        updateTarget(row.original.targetId, { method: value })
-                    }
-                >
-                    <SelectTrigger className="min-w-[100px]">
-                        {row.original.method}
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="http">http</SelectItem>
-                        <SelectItem value="https">https</SelectItem>
-                    </SelectContent>
-                </Select>
-            )
-        },
-        {
             accessorKey: "ip",
             header: "IP / Hostname",
             cell: ({ row }) => (
@@ -436,6 +416,32 @@ export default function ReverseProxyTargets(props: {
         }
     ];
 
+    if (resource.http) {
+        const methodCol: ColumnDef<LocalTarget> = {
+            accessorKey: "method",
+            header: "Method",
+            cell: ({ row }) => (
+                <Select
+                    defaultValue={row.original.method ?? ""}
+                    onValueChange={(value) =>
+                        updateTarget(row.original.targetId, { method: value })
+                    }
+                >
+                    <SelectTrigger className="min-w-[100px]">
+                        {row.original.method}
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="http">http</SelectItem>
+                        <SelectItem value="https">https</SelectItem>
+                    </SelectContent>
+                </Select>
+            )
+        };
+
+        // add this to the first column
+        columns.unshift(methodCol);
+    }
+
     const table = useReactTable({
         data: targets,
         columns,
@@ -451,7 +457,7 @@ export default function ReverseProxyTargets(props: {
 
     return (
         <SettingsContainer>
-            {/* SSL Section */}
+            {resource.http && (
             <SettingsSection>
                 <SettingsSectionHeader>
                     <SettingsSectionTitle>
@@ -473,7 +479,7 @@ export default function ReverseProxyTargets(props: {
                     />
                 </SettingsSectionBody>
             </SettingsSection>
-
+)}
             {/* Targets Section */}
             <SettingsSection>
                 <SettingsSectionHeader>
@@ -491,6 +497,8 @@ export default function ReverseProxyTargets(props: {
                             className="space-y-4"
                         >
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                {resource.http && (
+
                                 <FormField
                                     control={addTargetForm.control}
                                     name="method"
@@ -499,7 +507,7 @@ export default function ReverseProxyTargets(props: {
                                             <FormLabel>Method</FormLabel>
                                             <FormControl>
                                                 <Select
-                                                    {...field}
+                                                    value={field.value || undefined}    
                                                     onValueChange={(value) => {
                                                         addTargetForm.setValue(
                                                             "method",
@@ -524,6 +532,8 @@ export default function ReverseProxyTargets(props: {
                                         </FormItem>
                                     )}
                                 />
+                            )}
+
                                 <FormField
                                     control={addTargetForm.control}
                                     name="ip"
@@ -637,6 +647,9 @@ export default function ReverseProxyTargets(props: {
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    <SettingsSectionDescription>
+                        Multiple targets will get load balanced by Traefik. You can use this for high availability.
+                    </SettingsSectionDescription>
                 </SettingsSectionBody>
                 <SettingsSectionFooter>
                     <Button

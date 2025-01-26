@@ -112,6 +112,7 @@ export async function createResource(
             );
         }
 
+        const fullDomain = `${subdomain}.${org[0].domain}`;
         // if http is false check to see if there is already a resource with the same port and protocol
         if (!http) {
             const existingResource = await db
@@ -132,9 +133,23 @@ export async function createResource(
                     )
                 );
             }
+        } else {
+            // make sure the full domain is unique
+            const existingResource = await db
+                .select()
+                .from(resources)
+                .where(eq(resources.fullDomain, fullDomain));
+            
+            if (existingResource.length > 0) {
+                return next(
+                    createHttpError(
+                        HttpCode.CONFLICT,
+                        "Resource with that domain already exists"
+                    )
+                );
+            }
         }
 
-        const fullDomain = `${subdomain}.${org[0].domain}`;
         await db.transaction(async (trx) => {
             const newResource = await trx
                 .insert(resources)
@@ -184,18 +199,6 @@ export async function createResource(
             });
         });
     } catch (error) {
-        if (
-            error instanceof SqliteError &&
-            error.code === "SQLITE_CONSTRAINT_UNIQUE"
-        ) {
-            return next(
-                createHttpError(
-                    HttpCode.CONFLICT,
-                    "Resource with that subdomain already exists"
-                )
-            );
-        }
-
         logger.error(error);
         return next(
             createHttpError(HttpCode.INTERNAL_SERVER_ERROR, "An error occurred")
