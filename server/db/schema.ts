@@ -315,6 +315,10 @@ export const resourceSessions = sqliteTable("resourceSessions", {
     doNotExtend: integer("doNotExtend", { mode: "boolean" })
         .notNull()
         .default(false),
+    isRequestToken: integer("isRequestToken", { mode: "boolean" }),
+    userSessionId: text("userSessionId").references(() => sessions.sessionId, {
+        onDelete: "cascade"
+    }),
     passwordId: integer("passwordId").references(
         () => resourcePassword.passwordId,
         {

@@ -11,9 +11,7 @@ import { z } from "zod";
 import { fromError } from "zod-validation-error";
 import {
     createResourceSession,
-    serializeResourceSessionCookie
 } from "@server/auth/sessions/resource";
-import config from "@server/lib/config";
 import logger from "@server/logger";
 import { verifyPassword } from "@server/auth/password";
 
@@ -120,11 +118,12 @@ export async function authWithPassword(
         await createResourceSession({
             resourceId,
             token,
-            passwordId: definedPassword.passwordId
+            passwordId: definedPassword.passwordId,
+            isRequestToken: true,
+            expiresAt: Date.now() + 1000 * 30, // 30 seconds
+            sessionLength: 1000 * 30,
+            doNotExtend: true
         });
-        const cookieName = `${config.getRawConfig().server.resource_session_cookie_name}_${resource.resourceId}`;
-        const cookie = serializeResourceSessionCookie(cookieName, token);
-        res.appendHeader("Set-Cookie", cookie);
 
         return response<AuthWithPasswordResponse>(res, {
             data: {

@@ -1,7 +1,6 @@
 import {
-    AuthWithAccessTokenResponse,
     GetResourceAuthInfoResponse,
-    GetResourceResponse
+    GetExchangeTokenResponse
 } from "@server/routers/resource";
 import ResourceAuthPortal from "./ResourceAuthPortal";
 import { internal, priv } from "@app/lib/api";
@@ -12,9 +11,6 @@ import { verifySession } from "@app/lib/auth/verifySession";
 import { redirect } from "next/navigation";
 import ResourceNotFound from "./ResourceNotFound";
 import ResourceAccessDenied from "./ResourceAccessDenied";
-import { cookies } from "next/headers";
-import { CheckResourceSessionResponse } from "@server/routers/auth";
-import AccessTokenInvalid from "./AccessToken";
 import AccessToken from "./AccessToken";
 import { pullEnv } from "@app/lib/pullEnv";
 
@@ -48,7 +44,7 @@ export default async function ResourceAuthPage(props: {
         // TODO: fix this
         return (
             <div className="w-full max-w-md">
-            {/* @ts-ignore */}
+                {/* @ts-ignore */}
                 <ResourceNotFound />
             </div>
         );
@@ -83,49 +79,41 @@ export default async function ResourceAuthPage(props: {
         );
     }
 
-    const allCookies = await cookies();
-    const cookieName =
-        env.server.resourceSessionCookieName + `_${params.resourceId}`;
-    const sessionId = allCookies.get(cookieName)?.value ?? null;
-
-    if (sessionId) {
-        let doRedirect = false;
-        try {
-            const res = await priv.get<
-                AxiosResponse<CheckResourceSessionResponse>
-            >(`/resource-session/${params.resourceId}/${sessionId}`);
-
-            if (res && res.data.data.valid) {
-                doRedirect = true;
-            }
-        } catch (e) {}
-
-        if (doRedirect) {
-            redirect(redirectUrl);
-        }
-    }
-
     if (!hasAuth) {
         // no authentication so always go straight to the resource
         redirect(redirectUrl);
     }
 
+
+    // convert the dashboard token into a resource session token
     let userIsUnauthorized = false;
     if (user && authInfo.sso) {
-        let doRedirect = false;
+        let redirectToUrl: string | undefined;
         try {
-            const res = await internal.get<AxiosResponse<GetResourceResponse>>(
-                `/resource/${params.resourceId}`,
+            const res = await priv.post<
+                AxiosResponse<GetExchangeTokenResponse>
+            >(
+                `/resource/${params.resourceId}/get-exchange-token`,
+                {},
                 await authCookieHeader()
             );
 
-            doRedirect = true;
+            if (res.data.data.requestToken) {
+                const paramName = env.server.resourceSessionRequestParam;
+                // append the param with the token to the redirect url
+                const fullUrl = new URL(redirectUrl);
+                fullUrl.searchParams.append(
+                    paramName,
+                    res.data.data.requestToken
+                );
+                redirectToUrl = fullUrl.toString();
+            }
         } catch (e) {
             userIsUnauthorized = true;
         }
 
-        if (doRedirect) {
-            redirect(redirectUrl);
+        if (redirectToUrl) {
+            redirect(redirectToUrl);
         }
     }
 

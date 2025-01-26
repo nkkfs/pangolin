@@ -6,19 +6,20 @@ import { eq, and } from "drizzle-orm";
 import config from "@server/lib/config";
 
 export const SESSION_COOKIE_NAME =
-    config.getRawConfig().server.resource_session_cookie_name;
-export const SESSION_COOKIE_EXPIRES = 1000 * 60 * 60 * 24 * 30;
+    config.getRawConfig().server.session_cookie_name;
+export const SESSION_COOKIE_EXPIRES =
+    1000 * 60 * 60 * config.getRawConfig().server.resource_session_length_hours;
 export const SECURE_COOKIES = config.getRawConfig().server.secure_cookies;
-export const COOKIE_DOMAIN = "." + config.getBaseDomain();
 
 export async function createResourceSession(opts: {
     token: string;
     resourceId: number;
-    passwordId?: number;
-    pincodeId?: number;
-    whitelistId?: number;
-    accessTokenId?: string;
-    usedOtp?: boolean;
+    isRequestToken?: boolean;
+    passwordId?: number | null;
+    pincodeId?: number | null;
+    userSessionId?: string | null;
+    whitelistId?: number | null;
+    accessTokenId?: string | null;
     doNotExtend?: boolean;
     expiresAt?: number | null;
     sessionLength?: number | null;
@@ -27,7 +28,8 @@ export async function createResourceSession(opts: {
         !opts.passwordId &&
         !opts.pincodeId &&
         !opts.whitelistId &&
-        !opts.accessTokenId
+        !opts.accessTokenId &&
+        !opts.userSessionId
     ) {
         throw new Error("Auth method must be provided");
     }
@@ -47,7 +49,9 @@ export async function createResourceSession(opts: {
         pincodeId: opts.pincodeId || null,
         whitelistId: opts.whitelistId || null,
         doNotExtend: opts.doNotExtend || false,
-        accessTokenId: opts.accessTokenId || null
+        accessTokenId: opts.accessTokenId || null,
+        isRequestToken: opts.isRequestToken || false,
+        userSessionId: opts.userSessionId || null
     };
 
     await db.insert(resourceSessions).values(session);
@@ -162,22 +166,25 @@ export async function invalidateAllSessions(
 
 export function serializeResourceSessionCookie(
     cookieName: string,
-    token: string
+    domain: string,
+    token: string,
+    isHttp: boolean = false
 ): string {
-    if (SECURE_COOKIES) {
-        return `${cookieName}=${token}; HttpOnly; SameSite=Strict; Max-Age=${SESSION_COOKIE_EXPIRES}; Path=/; Secure; Domain=${COOKIE_DOMAIN}`;
+    if (SECURE_COOKIES && !isHttp) {
+        return `${cookieName}_s=${token}; HttpOnly; SameSite=Strict; Max-Age=${SESSION_COOKIE_EXPIRES / 1000}; Path=/; Secure; Domain=${"." + domain}`;
     } else {
-        return `${cookieName}=${token}; HttpOnly; SameSite=Strict; Max-Age=${SESSION_COOKIE_EXPIRES}; Path=/; Domain=${COOKIE_DOMAIN}`;
+        return `${cookieName}=${token}; HttpOnly; SameSite=Strict; Max-Age=${SESSION_COOKIE_EXPIRES / 1000}; Path=/; Domain=${"." + domain}`;
     }
 }
 
 export function createBlankResourceSessionTokenCookie(
-    cookieName: string
+    cookieName: string,
+    domain: string
 ): string {
     if (SECURE_COOKIES) {
-        return `${cookieName}=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/; Secure; Domain=${COOKIE_DOMAIN}`;
+        return `${cookieName}_s=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/; Secure; Domain=${"." + domain}`;
     } else {
-        return `${cookieName}=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/; Domain=${COOKIE_DOMAIN}`;
+        return `${cookieName}=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/; Domain=${"." + domain}`;
     }
 }
 

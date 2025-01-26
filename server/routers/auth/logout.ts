@@ -5,18 +5,17 @@ import response from "@server/lib/response";
 import logger from "@server/logger";
 import {
     createBlankSessionTokenCookie,
-    invalidateSession,
-    SESSION_COOKIE_NAME
+    invalidateSession
 } from "@server/auth/sessions/app";
+import { verifySession } from "@server/auth/sessions/verifySession";
 
 export async function logout(
     req: Request,
     res: Response,
     next: NextFunction
 ): Promise<any> {
-    const sessionId = req.cookies[SESSION_COOKIE_NAME];
-
-    if (!sessionId) {
+    const { user, session } = await verifySession(req);
+    if (!user || !session) {
         return next(
             createHttpError(
                 HttpCode.BAD_REQUEST,
@@ -26,7 +25,7 @@ export async function logout(
     }
 
     try {
-        await invalidateSession(sessionId);
+        await invalidateSession(session.sessionId);
         const isSecure = req.protocol === "https";
         res.setHeader("Set-Cookie", createBlankSessionTokenCookie(isSecure));
 

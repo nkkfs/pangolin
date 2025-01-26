@@ -3,7 +3,6 @@ import db from "@server/db";
 import {
     orgs,
     resourceOtp,
-    resourcePassword,
     resources,
     resourceWhitelist
 } from "@server/db/schema";
@@ -16,9 +15,7 @@ import { z } from "zod";
 import { fromError } from "zod-validation-error";
 import {
     createResourceSession,
-    serializeResourceSessionCookie
 } from "@server/auth/sessions/resource";
-import config from "@server/lib/config";
 import { isValidOtp, sendResourceOtpEmail } from "@server/auth/resourceOtp";
 import logger from "@server/logger";
 
@@ -178,11 +175,12 @@ export async function authWithWhitelist(
         await createResourceSession({
             resourceId,
             token,
-            whitelistId: whitelistedEmail.whitelistId
+            whitelistId: whitelistedEmail.whitelistId,
+            isRequestToken: true,
+            expiresAt: Date.now() + 1000 * 30, // 30 seconds
+            sessionLength: 1000 * 30,
+            doNotExtend: true
         });
-        const cookieName = `${config.getRawConfig().server.resource_session_cookie_name}_${resource.resourceId}`;
-        const cookie = serializeResourceSessionCookie(cookieName, token);
-        res.appendHeader("Set-Cookie", cookie);
 
         return response<AuthWithWhitelistResponse>(res, {
             data: {

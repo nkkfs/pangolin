@@ -5,14 +5,12 @@ import { Button } from "@app/components/ui/button";
 import {
     Card,
     CardContent,
-    CardFooter,
     CardHeader,
     CardTitle
 } from "@app/components/ui/card";
 import { useEnvContext } from "@app/hooks/useEnvContext";
 import { AuthWithAccessTokenResponse } from "@server/routers/resource";
 import { AxiosResponse } from "axios";
-import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -32,7 +30,17 @@ export default function AccessToken({
     const [loading, setLoading] = useState(true);
     const [isValid, setIsValid] = useState(false);
 
-    const api = createApiClient(useEnvContext());
+    const { env } = useEnvContext();
+    const api = createApiClient({ env });
+
+    function appendRequestToken(url: string, token: string) {
+        const fullUrl = new URL(url);
+        fullUrl.searchParams.append(
+            env.server.resourceSessionRequestParam,
+            token
+        );
+        return fullUrl.toString();
+    }
 
     useEffect(() => {
         if (!accessTokenId || !accessToken) {
@@ -51,7 +59,10 @@ export default function AccessToken({
 
                 if (res.data.data.session) {
                     setIsValid(true);
-                    window.location.href = redirectUrl;
+                    window.location.href = appendRequestToken(
+                        redirectUrl,
+                        res.data.data.session
+                    );
                 }
             } catch (e) {
                 console.error("Error checking access token", e);

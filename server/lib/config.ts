@@ -61,8 +61,20 @@ const configSchema = z.object({
         internal_hostname: z.string().transform((url) => url.toLowerCase()),
         secure_cookies: z.boolean(),
         session_cookie_name: z.string(),
-        resource_session_cookie_name: z.string(),
         resource_access_token_param: z.string(),
+        resource_session_request_param: z.string(),
+        dashboard_session_length_hours: z
+            .number()
+            .positive()
+            .gt(0)
+            .optional()
+            .default(720),
+        resource_session_length_hours: z
+            .number()
+            .positive()
+            .gt(0)
+            .optional()
+            .default(720),
         cors: z
             .object({
                 origins: z.array(z.string()).optional(),
@@ -241,8 +253,6 @@ export class Config {
             : "false";
         process.env.SESSION_COOKIE_NAME =
             parsedConfig.data.server.session_cookie_name;
-        process.env.RESOURCE_SESSION_COOKIE_NAME =
-            parsedConfig.data.server.resource_session_cookie_name;
         process.env.EMAIL_ENABLED = parsedConfig.data.email ? "true" : "false";
         process.env.DISABLE_SIGNUP_WITHOUT_INVITE = parsedConfig.data.flags
             ?.disable_signup_without_invite
@@ -254,6 +264,8 @@ export class Config {
             : "false";
         process.env.RESOURCE_ACCESS_TOKEN_PARAM =
             parsedConfig.data.server.resource_access_token_param;
+        process.env.RESOURCE_SESSION_REQUEST_PARAM =
+            parsedConfig.data.server.resource_session_request_param;
 
         this.rawConfig = parsedConfig.data;
     }

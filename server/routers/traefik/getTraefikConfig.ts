@@ -70,7 +70,7 @@ export async function traefikConfigProvider(
         }
 
         const badgerMiddlewareName = "badger";
-        const redirectMiddlewareName = "redirect-to-https";
+        const redirectHttpsMiddlewareName = "redirect-to-https";
 
         const config_output: any = {
             http: {
@@ -82,27 +82,16 @@ export async function traefikConfigProvider(
                             [badgerMiddlewareName]: {
                                 apiBaseUrl: new URL(
                                     "/api/v1",
-                                    `http://${
-                                        config.getRawConfig().server
-                                            .internal_hostname
-                                    }:${
-                                        config.getRawConfig().server
-                                            .internal_port
-                                    }`
+                                    `http://${config.getRawConfig().server.internal_hostname}:${config.getRawConfig().server.internal_port}`,
                                 ).href,
-                                resourceSessionCookieName:
-                                    config.getRawConfig().server
-                                        .resource_session_cookie_name,
                                 userSessionCookieName:
-                                    config.getRawConfig().server
-                                        .session_cookie_name,
-                                accessTokenQueryParam:
-                                    config.getRawConfig().server
-                                        .resource_access_token_param
-                            }
+                                    config.getRawConfig().server.session_cookie_name,
+                                accessTokenQueryParam: config.getRawConfig().server.resource_access_token_param,
+                                resourceSessionRequestParam: config.getRawConfig().server.resource_session_request_param
+                            },
                         }
                     },
-                    [redirectMiddlewareName]: {
+                    [redirectHttpsMiddlewareName]: {
                         redirectScheme: {
                             scheme: "https",
                             permanent: true
@@ -161,6 +150,7 @@ export async function traefikConfigProvider(
                         : {})
                 };
 
+<<<<<<< HEAD
                 config_output.http.routers![routerName] = {
                     entryPoints: [
                         resource.ssl
@@ -168,6 +158,24 @@ export async function traefikConfigProvider(
                             : config.getRawConfig().traefik.http_entrypoint
                     ],
                     middlewares: [badgerMiddlewareName],
+=======
+            http.routers![routerName] = {
+                entryPoints: [
+                    resource.ssl
+                        ? config.getRawConfig().traefik.https_entrypoint
+                        : config.getRawConfig().traefik.http_entrypoint,
+                ],
+                middlewares: [badgerMiddlewareName],
+                service: serviceName,
+                rule: `Host(\`${fullDomain}\`)`,
+                ...(resource.ssl ? { tls } : {}),
+            };
+
+            if (resource.ssl) {
+                http.routers![routerName + "-redirect"] = {
+                    entryPoints: [config.getRawConfig().traefik.http_entrypoint],
+                    middlewares: [redirectHttpsMiddlewareName],
+>>>>>>> dev
                     service: serviceName,
                     rule: `Host(\`${fullDomain}\`)`,
                     ...(resource.ssl ? { tls } : {})

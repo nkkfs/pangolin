@@ -2,7 +2,7 @@ import { runSetupFunctions } from "./setup";
 import { createApiServer } from "./apiServer";
 import { createNextServer } from "./nextServer";
 import { createInternalServer } from "./internalServer";
-import { User, UserOrg } from "./db/schema";
+import { Session, User, UserOrg } from "./db/schema";
 
 async function startServers() {
     await runSetupFunctions();
@@ -24,6 +24,7 @@ declare global {
     namespace Express {
         interface Request {
             user?: User;
+            session?: Session;
             userOrg?: UserOrg;
             userOrgRoleId?: number;
             userOrgId?: string;

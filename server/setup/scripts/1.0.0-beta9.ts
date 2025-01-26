@@ -7,10 +7,10 @@ import {
     userInvites,
     users
 } from "@server/db/schema";
+import { APP_PATH, configFilePath1, configFilePath2 } from "@server/lib/consts";
 import { sql } from "drizzle-orm";
 import fs from "fs";
 import yaml from "js-yaml";
-import { APP_PATH, configFilePath1, configFilePath2 } from "@server/lib/consts";
 import path from "path";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -38,40 +38,41 @@ export default async function migration() {
         console.error(error);
     }
 
-    // Determine which config file exists
-    const filePaths = [configFilePath1, configFilePath2];
-    let filePath = "";
-    for (const path of filePaths) {
-        if (fs.existsSync(path)) {
-            filePath = path;
-            break;
+    try {
+        // Determine which config file exists
+        const filePaths = [configFilePath1, configFilePath2];
+        let filePath = "";
+        for (const path of filePaths) {
+            if (fs.existsSync(path)) {
+                filePath = path;
+                break;
+            }
         }
-    }
 
-    if (!filePath) {
-        throw new Error(
-            `No config file found (expected config.yml or config.yaml).`
+        if (!filePath) {
+            throw new Error(
+                `No config file found (expected config.yml or config.yaml).`
+            );
+        }
+
+        // Read and parse the YAML file
+        let rawConfig: any;
+        const fileContents = fs.readFileSync(filePath, "utf8");
+        rawConfig = yaml.load(fileContents);
+
+        rawConfig.server.resource_session_request_param = "p_session_request";
+        rawConfig.server.session_cookie_name = "p_session_token"; // rename to prevent conflicts
+        delete rawConfig.server.resource_session_cookie_name;
+
+        // Write the updated YAML back to the file
+        const updatedYaml = yaml.dump(rawConfig);
+        fs.writeFileSync(filePath, updatedYaml, "utf8");
+    } catch (e) {
+        console.log(
+            `Failed to add resource_session_request_param to config. Please add it manually. https://docs.fossorial.io/Pangolin/Configuration/config`
         );
+        throw e;
     }
-
-    // Read and parse the YAML file
-    let rawConfig: any;
-    const fileContents = fs.readFileSync(filePath, "utf8");
-    rawConfig = yaml.load(fileContents);
-
-    // Validate the structure
-    if (!rawConfig.server) {
-        throw new Error(`Invalid config file: server is missing.`);
-    }
-
-    // Update the config
-    rawConfig.server.resource_access_token_param = "p_token";
-
-    // Write the updated YAML back to the file
-    const updatedYaml = yaml.dump(rawConfig);
-    fs.writeFileSync(filePath, updatedYaml, "utf8");
-
-    // then try to update badger in traefik config
 
     try {
         const traefikPath = path.join(
@@ -79,6 +80,7 @@ export default async function migration() {
             "traefik",
             "traefik_config.yml"
         );
+
 
         // read the traefik file
         // look for the websecure:
@@ -104,14 +106,22 @@ export default async function migration() {
                         })
                         .optional()
                 })
-                .optional()
-        });
+                .optional(),
+                experimental: z.object({
+                    plugins: z.object({
+                        badger: z.object({
+                            moduleName: z.string(),
+                            version: z.string()
+                        })
+                    })
+                })
+            });
 
         const traefikFileContents = fs.readFileSync(traefikPath, "utf8");
         const traefikConfig = yaml.load(traefikFileContents) as any;
 
-        // Validate existing config
         const parsedConfig = schema.safeParse(traefikConfig);
+
         if (!parsedConfig.success) {
             throw new Error(fromZodError(parsedConfig.error).toString());
         }
@@ -133,16 +143,31 @@ export default async function migration() {
             }
         };
 
+        traefikConfig.experimental.plugins.badger.version = "v1.0.0-beta.3";
+
         const updatedTraefikYaml = yaml.dump(traefikConfig);
         fs.writeFileSync(traefikPath, updatedTraefikYaml, "utf8");
+
         console.log(
-            "Added readTimeout to websecure entrypoint in your Traefik configuration."
+            "Updated the version of Badger in your Traefik configuration to v1.0.0-beta.3 and added readTimeout to websecure entrypoint in your Traefik configuration.."
         );
     } catch (e) {
         console.log(
-            "We were unable to update the readTimeout in Traefik config. Please update it manually."
+            "We were unable to update the version of Badger in your Traefik configuration. Please update it manually."
         );
         console.error(e);
+    }
+
+    try {
+        await db.transaction(async (trx) => {
+            trx.run(sql`ALTER TABLE 'resourceSessions' ADD 'isRequestToken' integer;`);
+            trx.run(sql`ALTER TABLE 'resourceSessions' ADD 'userSessionId' text REFERENCES session(id);`);
+        });
+    } catch (e) {
+        console.log(
+            "We were unable to add columns to the resourceSessions table."
+        );
+        throw e;
     }
 
     console.log("Done.");

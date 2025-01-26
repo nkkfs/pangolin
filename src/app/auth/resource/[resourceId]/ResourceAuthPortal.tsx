@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -8,7 +8,6 @@ import {
     Card,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle
 } from "@/components/ui/card";
@@ -30,9 +29,6 @@ import {
     Key,
     User,
     Send,
-    ArrowLeft,
-    ArrowRight,
-    Lock,
     AtSign
 } from "lucide-react";
 import {
@@ -47,10 +43,8 @@ import { AxiosResponse } from "axios";
 import LoginForm from "@app/components/LoginForm";
 import {
     AuthWithPasswordResponse,
-    AuthWithAccessTokenResponse,
     AuthWithWhitelistResponse
 } from "@server/routers/resource";
-import { redirect } from "next/dist/server/api-utils";
 import ResourceAccessDenied from "./ResourceAccessDenied";
 import { createApiClient } from "@app/lib/api";
 import { useEnvContext } from "@app/hooks/useEnvContext";
@@ -118,7 +112,9 @@ export default function ResourceAuthPortal(props: ResourceAuthPortalProps) {
 
     const [otpState, setOtpState] = useState<"idle" | "otp_sent">("idle");
 
-    const api = createApiClient(useEnvContext());
+    const { env } = useEnvContext();
+
+    const api = createApiClient({ env });
 
     function getDefaultSelectedMethod() {
         if (props.methods.sso) {
@@ -169,6 +165,15 @@ export default function ResourceAuthPortal(props: ResourceAuthPortalProps) {
         }
     });
 
+    function appendRequestToken(url: string, token: string) {
+        const fullUrl = new URL(url);
+        fullUrl.searchParams.append(
+            env.server.resourceSessionRequestParam,
+            token
+        );
+        return fullUrl.toString();
+    }
+
     const onWhitelistSubmit = (values: any) => {
         setLoadingLogin(true);
         api.post<AxiosResponse<AuthWithWhitelistResponse>>(
@@ -190,7 +195,7 @@ export default function ResourceAuthPortal(props: ResourceAuthPortalProps) {
 
                 const session = res.data.data.session;
                 if (session) {
-                    window.location.href = props.redirect;
+                    window.location.href = appendRequestToken(props.redirect, session);
                 }
             })
             .catch((e) => {
@@ -212,7 +217,7 @@ export default function ResourceAuthPortal(props: ResourceAuthPortalProps) {
                 setPincodeError(null);
                 const session = res.data.data.session;
                 if (session) {
-                    window.location.href = props.redirect;
+                    window.location.href = appendRequestToken(props.redirect, session);
                 }
             })
             .catch((e) => {
@@ -237,7 +242,7 @@ export default function ResourceAuthPortal(props: ResourceAuthPortalProps) {
                 setPasswordError(null);
                 const session = res.data.data.session;
                 if (session) {
-                    window.location.href = props.redirect;
+                    window.location.href = appendRequestToken(props.redirect, session);
                 }
             })
             .catch((e) => {
@@ -619,16 +624,6 @@ export default function ResourceAuthPortal(props: ResourceAuthPortalProps) {
                             </Tabs>
                         </CardContent>
                     </Card>
-                    {/* {activeTab === "sso" && (
-                        <div className="flex justify-center mt-4">
-                            <p className="text-sm text-muted-foreground">
-                                Don't have an account?{" "}
-                                <a href="#" className="underline">
-                                    Sign up
-                                </a>
-                            </p>
-                        </div>
-                    )} */}
                 </div>
             ) : (
                 <ResourceAccessDenied />

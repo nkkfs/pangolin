@@ -4,17 +4,17 @@ import createHttpError from "http-errors";
 import { z } from "zod";
 import { fromError } from "zod-validation-error";
 import { response } from "@server/lib/response";
-import { validateSessionToken } from "@server/auth/sessions/app";
 import db from "@server/db";
 import {
     ResourceAccessToken,
-    resourceAccessToken,
+    ResourcePassword,
     resourcePassword,
+    ResourcePincode,
     resourcePincode,
     resources,
-    resourceWhitelist,
-    User,
-    userOrgs
+    sessions,
+    userOrgs,
+    users
 } from "@server/db/schema";
 import { and, eq } from "drizzle-orm";
 import config from "@server/lib/config";
@@ -27,6 +27,12 @@ import { Resource, roleResources, userResources } from "@server/db/schema";
 import logger from "@server/logger";
 import { verifyResourceAccessToken } from "@server/auth/verifyResourceAccessToken";
 import { generateSessionToken } from "@server/auth";
+import NodeCache from "node-cache";
+
+// We'll see if this speeds anything up
+const cache = new NodeCache({
+    stdTTL: 5 // seconds
+});
 
 const verifyResourceSessionSchema = z.object({
     sessions: z.record(z.string()).optional(),
@@ -53,7 +59,7 @@ export async function verifyResourceSession(
     res: Response,
     next: NextFunction
 ): Promise<any> {
-    logger.debug("Badger sent", req.body); // remove when done testing
+    logger.debug("Verify session: Badger sent", req.body); // remove when done testing
 
     const parsedBody = verifyResourceSessionSchema.safeParse(req.body);
 
@@ -67,26 +73,52 @@ export async function verifyResourceSession(
     }
 
     try {
-        const { sessions, host, originalRequestURL, accessToken: token } =
-            parsedBody.data;
+        const {
+            sessions,
+            host,
+            originalRequestURL,
+            accessToken: token
+        } = parsedBody.data;
 
-        const [result] = await db
-            .select()
-            .from(resources)
-            .leftJoin(
-                resourcePincode,
-                eq(resourcePincode.resourceId, resources.resourceId)
-            )
-            .leftJoin(
-                resourcePassword,
-                eq(resourcePassword.resourceId, resources.resourceId)
-            )
-            .where(eq(resources.fullDomain, host))
-            .limit(1);
+        const resourceCacheKey = `resource:${host}`;
+        let resourceData:
+            | {
+                  resource: Resource | null;
+                  pincode: ResourcePincode | null;
+                  password: ResourcePassword | null;
+              }
+            | undefined = cache.get(resourceCacheKey);
 
-        const resource = result?.resources;
-        const pincode = result?.resourcePincode;
-        const password = result?.resourcePassword;
+        if (!resourceData) {
+            const [result] = await db
+                .select()
+                .from(resources)
+                .leftJoin(
+                    resourcePincode,
+                    eq(resourcePincode.resourceId, resources.resourceId)
+                )
+                .leftJoin(
+                    resourcePassword,
+                    eq(resourcePassword.resourceId, resources.resourceId)
+                )
+                .where(eq(resources.fullDomain, host))
+                .limit(1);
+
+            if (!result) {
+                logger.debug("Resource not found", host);
+                return notAllowed(res);
+            }
+
+            resourceData = {
+                resource: result.resources,
+                pincode: result.resourcePincode,
+                password: result.resourcePassword
+            };
+
+            cache.set(resourceCacheKey, resourceData);
+        }
+
+        const { resource, pincode, password } = resourceData;
 
         if (!resource) {
             logger.debug("Resource not found", host);
@@ -145,37 +177,31 @@ export async function verifyResourceSession(
             return notAllowed(res);
         }
 
-        const sessionToken =
-            sessions[config.getRawConfig().server.session_cookie_name];
-
-        // check for unified login
-        if (sso && sessionToken) {
-            const { session, user } = await validateSessionToken(sessionToken);
-            if (session && user) {
-                const isAllowed = await isUserAllowedToAccessResource(
-                    user,
-                    resource
-                );
-
-                if (isAllowed) {
-                    logger.debug(
-                        "Resource allowed because user session is valid"
-                    );
-                    return allowed(res);
-                }
-            }
-        }
-
         const resourceSessionToken =
             sessions[
-                `${config.getRawConfig().server.resource_session_cookie_name}_${resource.resourceId}`
+                `${config.getRawConfig().server.session_cookie_name}${resource.ssl ? "_s" : ""}`
             ];
 
         if (resourceSessionToken) {
-            const { resourceSession } = await validateResourceSessionToken(
-                resourceSessionToken,
-                resource.resourceId
-            );
+            const sessionCacheKey = `session:${resourceSessionToken}`;
+            let resourceSession: any = cache.get(sessionCacheKey);
+
+            if (!resourceSession) {
+                const result = await validateResourceSessionToken(
+                    resourceSessionToken,
+                    resource.resourceId
+                );
+
+                resourceSession = result?.resourceSession;
+                cache.set(sessionCacheKey, resourceSession);
+            }
+
+            if (resourceSession?.isRequestToken) {
+                logger.debug(
+                    "Resource not allowed because session is a temporary request token"
+                );
+                return notAllowed(res);
+            }
 
             if (resourceSession) {
                 if (pincode && resourceSession.pincodeId) {
@@ -207,6 +233,29 @@ export async function verifyResourceSession(
                         "Resource allowed because access token session is valid"
                     );
                     return allowed(res);
+                }
+
+                if (resourceSession.userSessionId && sso) {
+                    const userAccessCacheKey = `userAccess:${resourceSession.userSessionId}:${resource.resourceId}`;
+
+                    let isAllowed: boolean | undefined =
+                        cache.get(userAccessCacheKey);
+
+                    if (isAllowed === undefined) {
+                        isAllowed = await isUserAllowedToAccessResource(
+                            resourceSession.userSessionId,
+                            resource
+                        );
+
+                        cache.set(userAccessCacheKey, isAllowed);
+                    }
+
+                    if (isAllowed) {
+                        logger.debug(
+                            "Resource allowed because user session is valid"
+                        );
+                        return allowed(res);
+                    }
                 }
             }
         }
@@ -272,10 +321,15 @@ async function createAccessTokenSession(
         expiresAt: tokenItem.expiresAt,
         doNotExtend: tokenItem.expiresAt ? true : false
     });
-    const cookieName = `${config.getRawConfig().server.resource_session_cookie_name}_${resource.resourceId}`;
-    const cookie = serializeResourceSessionCookie(cookieName, token);
+    const cookieName = `${config.getRawConfig().server.session_cookie_name}`;
+    const cookie = serializeResourceSessionCookie(
+        cookieName,
+        resource.fullDomain,
+        token,
+        !resource.ssl
+    );
     res.appendHeader("Set-Cookie", cookie);
-    logger.debug("Access token is valid, creating new session")
+    logger.debug("Access token is valid, creating new session");
     return response<VerifyUserResponse>(res, {
         data: { valid: true },
         success: true,
@@ -286,9 +340,22 @@ async function createAccessTokenSession(
 }
 
 async function isUserAllowedToAccessResource(
-    user: User,
+    userSessionId: string,
     resource: Resource
 ): Promise<boolean> {
+    const [res] = await db
+        .select()
+        .from(sessions)
+        .leftJoin(users, eq(users.userId, sessions.userId))
+        .where(eq(sessions.sessionId, userSessionId));
+
+    const user = res.user;
+    const session = res.session;
+
+    if (!user || !session) {
+        return false;
+    }
+
     if (
         config.getRawConfig().flags?.require_email_verification &&
         !user.emailVerified

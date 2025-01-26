@@ -1,28 +1,21 @@
-import { verify } from "@node-rs/argon2";
 import { generateSessionToken } from "@server/auth/sessions/app";
 import db from "@server/db";
 import {
     orgs,
-    resourceOtp,
     resourcePincode,
     resources,
-    resourceWhitelist
 } from "@server/db/schema";
 import HttpCode from "@server/types/HttpCode";
 import response from "@server/lib/response";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextFunction, Request, Response } from "express";
 import createHttpError from "http-errors";
 import { z } from "zod";
 import { fromError } from "zod-validation-error";
 import {
     createResourceSession,
-    serializeResourceSessionCookie
 } from "@server/auth/sessions/resource";
 import logger from "@server/logger";
-import config from "@server/lib/config";
-import { AuthWithPasswordResponse } from "./authWithPassword";
-import { isValidOtp, sendResourceOtpEmail } from "@server/auth/resourceOtp";
 import { verifyPassword } from "@server/auth/password";
 
 export const authWithPincodeBodySchema = z
@@ -128,11 +121,12 @@ export async function authWithPincode(
         await createResourceSession({
             resourceId,
             token,
-            pincodeId: definedPincode.pincodeId
+            pincodeId: definedPincode.pincodeId,
+            isRequestToken: true,
+            expiresAt: Date.now() + 1000 * 30, // 30 seconds
+            sessionLength: 1000 * 30,
+            doNotExtend: true
         });
-        const cookieName = `${config.getRawConfig().server.resource_session_cookie_name}_${resource.resourceId}`;
-        const cookie = serializeResourceSessionCookie(cookieName, token);
-        res.appendHeader("Set-Cookie", cookie);
 
         return response<AuthWithPincodeResponse>(res, {
             data: {

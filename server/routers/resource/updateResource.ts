@@ -111,6 +111,10 @@ export async function updateResource(
             );
         }
 
+        if (resource[0].resources.ssl !== updatedResource[0].ssl) {
+            // invalidate all sessions?
+        }
+
         return response(res, {
             data: updatedResource[0],
             success: true,

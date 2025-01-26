@@ -3,7 +3,13 @@ import {
     encodeHexLowerCase
 } from "@oslojs/encoding";
 import { sha256 } from "@oslojs/crypto/sha2";
-import { Session, sessions, User, users } from "@server/db/schema";
+import {
+    resourceSessions,
+    Session,
+    sessions,
+    User,
+    users
+} from "@server/db/schema";
 import db from "@server/db";
 import { eq } from "drizzle-orm";
 import config from "@server/lib/config";
@@ -13,9 +19,14 @@ import logger from "@server/logger";
 
 export const SESSION_COOKIE_NAME =
     config.getRawConfig().server.session_cookie_name;
-export const SESSION_COOKIE_EXPIRES = 1000 * 60 * 60 * 24 * 30;
+export const SESSION_COOKIE_EXPIRES =
+    1000 *
+    60 *
+    60 *
+    config.getRawConfig().server.dashboard_session_length_hours;
 export const SECURE_COOKIES = config.getRawConfig().server.secure_cookies;
-export const COOKIE_DOMAIN = "." + config.getBaseDomain();
+export const COOKIE_DOMAIN =
+    "." + new URL(config.getRawConfig().app.dashboard_url).hostname;
 
 export function generateSessionToken(): string {
     const bytes = new Uint8Array(20);
@@ -65,12 +76,21 @@ export async function validateSessionToken(
         session.expiresAt = new Date(
             Date.now() + SESSION_COOKIE_EXPIRES
         ).getTime();
-        await db
-            .update(sessions)
-            .set({
-                expiresAt: session.expiresAt
-            })
-            .where(eq(sessions.sessionId, session.sessionId));
+        await db.transaction(async (trx) => {
+            await trx
+                .update(sessions)
+                .set({
+                    expiresAt: session.expiresAt
+                })
+                .where(eq(sessions.sessionId, session.sessionId));
+
+            await trx
+                .update(resourceSessions)
+                .set({
+                    expiresAt: session.expiresAt
+                })
+                .where(eq(resourceSessions.userSessionId, session.sessionId));
+        });
     }
     return { session, user };
 }
@@ -90,9 +110,9 @@ export function serializeSessionCookie(
     if (isSecure) {
         logger.debug("Setting cookie for secure origin");
         if (SECURE_COOKIES) {
-            return `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Max-Age=${SESSION_COOKIE_EXPIRES}; Path=/; Secure; Domain=${COOKIE_DOMAIN}`;
+            return `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Max-Age=${SESSION_COOKIE_EXPIRES / 1000}; Path=/; Secure; Domain=${COOKIE_DOMAIN}`;
         } else {
-            return `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Max-Age=${SESSION_COOKIE_EXPIRES}; Path=/; Domain=${COOKIE_DOMAIN}`;
+            return `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Max-Age=${SESSION_COOKIE_EXPIRES / 1000}; Path=/; Domain=${COOKIE_DOMAIN}`;
         }
     } else {
         return `${SESSION_COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Max-Age=${SESSION_COOKIE_EXPIRES}; Path=/;`;
