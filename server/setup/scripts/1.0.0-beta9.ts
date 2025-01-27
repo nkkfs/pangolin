@@ -58,7 +58,7 @@ export default async function migration() {
                 FOREIGN KEY (siteId) REFERENCES sites(siteId) ON UPDATE no action ON DELETE cascade,
                 FOREIGN KEY (orgId) REFERENCES orgs(orgId) ON UPDATE no action ON DELETE cascade
             );`)
-            trx.run(sql`INSERT INTO __new_resources("resourceId", "siteId", "orgId", "name", "subdomain", "fullDomain", "ssl", "blockAccess", "sso", "http", "protocol", "proxyPort", "emailWhitelistEnabled") SELECT "resourceId", "siteId", "orgId", "name", "subdomain", "fullDomain", "ssl", "blockAccess", "sso", "http", "protocol", "proxyPort", "emailWhitelistEnabled" FROM resources;`)
+            trx.run(sql`INSERT INTO __new_resources(resourceId, siteId, orgId, name, subdomain, fullDomain, ssl, blockAccess, sso, http, protocol, proxyPort, emailWhitelistEnabled) SELECT resourceId, siteId, orgId, name, subdomain, fullDomain, ssl, blockAccess, sso, http, protocol, proxyPort, emailWhitelistEnabled FROM resources;`)
             trx.run(sql`DROP TABLE resources;`)
             trx.run(sql`ALTER TABLE __new_resources RENAME TO resources;`)
             trx.run(sql`PRAGMA foreign_keys=ON;`)
@@ -72,7 +72,7 @@ export default async function migration() {
                 enabled integer DEFAULT true NOT NULL,
                 FOREIGN KEY (resourceId) REFERENCES resources(resourceId) ON UPDATE no action ON DELETE cascade
             );`)
-            trx.run(sql`INSERT INTO __new_targets("targetId", "resourceId", "ip", "method", "port", "internalPort", "enabled") SELECT "targetId", "resourceId", "ip", "method", "port", "internalPort", "enabled" FROM targets;`)
+            trx.run(sql`INSERT INTO __new_targets(targetId, resourceId, ip, method, port, internalPort, enabled) SELECT targetId, resourceId, ip, method, port, internalPort, enabled FROM targets;`)
             trx.run(sql`DROP TABLE targets;`)
             trx.run(sql`ALTER TABLE __new_targets RENAME TO targets;`)
         });

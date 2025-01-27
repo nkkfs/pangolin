@@ -134,6 +134,16 @@ export async function createResource(
                 );
             }
         } else {
+
+            if (proxyPort === 443 || proxyPort === 80) {
+                return next(
+                    createHttpError(
+                        HttpCode.BAD_REQUEST,
+                        "Port 80 and 443 are reserved for https resources"
+                    )
+                );
+            }
+
             // make sure the full domain is unique
             const existingResource = await db
                 .select()

@@ -1,11 +1,10 @@
 import { Request, Response } from "express";
 import db from "@server/db";
-import * as schema from "@server/db/schema";
 import { and, eq, isNotNull } from "drizzle-orm";
 import logger from "@server/logger";
 import HttpCode from "@server/types/HttpCode";
 import config from "@server/lib/config";
-import { Target } from "@server/db/schema";
+import { orgs, resources, sites, Target, targets } from "@server/db/schema";
 import { sql } from "drizzle-orm";
 
 export async function traefikConfigProvider(
@@ -16,54 +15,48 @@ export async function traefikConfigProvider(
         const allResources = await db
             .select({
                 // Resource fields
-                resourceId: schema.resources.resourceId,
-                subdomain: schema.resources.subdomain,
-                fullDomain: schema.resources.fullDomain,
-                ssl: schema.resources.ssl,
-                blockAccess: schema.resources.blockAccess,
-                sso: schema.resources.sso,
-                emailWhitelistEnabled: schema.resources.emailWhitelistEnabled,
-                http: schema.resources.http,
-                proxyPort: schema.resources.proxyPort,
-                protocol: schema.resources.protocol,
+                resourceId: resources.resourceId,
+                subdomain: resources.subdomain,
+                fullDomain: resources.fullDomain,
+                ssl: resources.ssl,
+                blockAccess: resources.blockAccess,
+                sso: resources.sso,
+                emailWhitelistEnabled: resources.emailWhitelistEnabled,
+                http: resources.http,
+                proxyPort: resources.proxyPort,
+                protocol: resources.protocol,
                 // Site fields
                 site: {
-                    siteId: schema.sites.siteId,
-                    type: schema.sites.type,
-                    subnet: schema.sites.subnet
+                    siteId: sites.siteId,
+                    type: sites.type,
+                    subnet: sites.subnet
                 },
                 // Org fields
                 org: {
-                    orgId: schema.orgs.orgId,
-                    domain: schema.orgs.domain
+                    orgId: orgs.orgId,
+                    domain: orgs.domain
                 },
                 // Targets as a subquery
                 targets: sql<string>`json_group_array(json_object(
-              'targetId', ${schema.targets.targetId},
-              'ip', ${schema.targets.ip},
-              'method', ${schema.targets.method},
-              'port', ${schema.targets.port},
-              'internalPort', ${schema.targets.internalPort},
-              'enabled', ${schema.targets.enabled}
-            ))`.as("targets")
+          'targetId', ${targets.targetId},
+          'ip', ${targets.ip},
+          'method', ${targets.method},
+          'port', ${targets.port},
+          'internalPort', ${targets.internalPort},
+          'enabled', ${targets.enabled}
+        ))`.as("targets")
             })
-            .from(schema.resources)
-            .innerJoin(
-                schema.sites,
-                eq(schema.sites.siteId, schema.resources.siteId)
-            )
-            .innerJoin(
-                schema.orgs,
-                eq(schema.resources.orgId, schema.orgs.orgId)
-            )
+            .from(resources)
+            .innerJoin(sites, eq(sites.siteId, resources.siteId))
+            .innerJoin(orgs, eq(resources.orgId, orgs.orgId))
             .leftJoin(
-                schema.targets,
+                targets,
                 and(
-                    eq(schema.targets.resourceId, schema.resources.resourceId),
-                    eq(schema.targets.enabled, true)
+                    eq(targets.resourceId, resources.resourceId),
+                    eq(targets.enabled, true)
                 )
             )
-            .groupBy(schema.resources.resourceId);
+            .groupBy(resources.resourceId);
 
         if (!allResources.length) {
             return res.status(HttpCode.OK).json({});
@@ -72,7 +65,9 @@ export async function traefikConfigProvider(
         const badgerMiddlewareName = "badger";
         const redirectHttpsMiddlewareName = "redirect-to-https";
 
+        // Initialize configuration with dynamic entryPoints
         const config_output: any = {
+            entryPoints: {},
             http: {
                 routers: {},
                 services: {},
@@ -82,13 +77,21 @@ export async function traefikConfigProvider(
                             [badgerMiddlewareName]: {
                                 apiBaseUrl: new URL(
                                     "/api/v1",
-                                    `http://${config.getRawConfig().server.internal_hostname}:${config.getRawConfig().server.internal_port}`,
+                                    `http://${config.getRawConfig().server.internal_hostname}:${
+                                        config.getRawConfig().server
+                                            .internal_port
+                                    }`
                                 ).href,
                                 userSessionCookieName:
-                                    config.getRawConfig().server.session_cookie_name,
-                                accessTokenQueryParam: config.getRawConfig().server.resource_access_token_param,
-                                resourceSessionRequestParam: config.getRawConfig().server.resource_session_request_param
-                            },
+                                    config.getRawConfig().server
+                                        .session_cookie_name,
+                                accessTokenQueryParam:
+                                    config.getRawConfig().server
+                                        .resource_access_token_param,
+                                resourceSessionRequestParam:
+                                    config.getRawConfig().server
+                                        .resource_session_request_param
+                            }
                         }
                     },
                     [redirectHttpsMiddlewareName]: {
@@ -109,15 +112,13 @@ export async function traefikConfigProvider(
             }
         };
 
+        // Create a Set to track unique ports for TCP/UDP
+        const usedPorts = new Set<number>();
+
         for (const resource of allResources) {
             const targets = JSON.parse(resource.targets);
-            
             const site = resource.site;
             const org = resource.org;
-
-            if (!resource.subdomain) {
-                continue;
-            }
 
             if (!org.domain) {
                 continue;
@@ -125,10 +126,14 @@ export async function traefikConfigProvider(
 
             const routerName = `${resource.resourceId}-router`;
             const serviceName = `${resource.resourceId}-service`;
-
             const fullDomain = `${resource.subdomain}.${org.domain}`;
 
             if (resource.http) {
+                // HTTP configuration remains the same
+                if (!resource.subdomain) {
+                    continue;
+                }
+
                 const domainParts = fullDomain.split(".");
                 let wildCard;
                 if (domainParts.length <= 2) {
@@ -163,7 +168,6 @@ export async function traefikConfigProvider(
                 };
 
                 if (resource.ssl) {
-                    // this is a redirect router; all it does is redirect to the https version if tls is enabled
                     config_output.http.routers![routerName + "-redirect"] = {
                         entryPoints: [
                             config.getRawConfig().traefik.http_entrypoint
@@ -176,46 +180,75 @@ export async function traefikConfigProvider(
 
                 config_output.http.services![serviceName] = {
                     loadBalancer: {
-                        servers: targets.map((target: Target) => {
-                            if (
-                                site.type === "local" ||
-                                site.type === "wireguard"
-                            ) {
-                                return {
-                                    url: `${target.method}://${target.ip}:${target.port}`
-                                };
-                            } else if (site.type === "newt") {
-                                const ip = site.subnet.split("/")[0];
-                                return {
-                                    url: `${target.method}://${ip}:${target.internalPort}`
-                                };
-                            }
-                        })
+                        servers: targets
+                            .filter(
+                                (target: Target) => target.internalPort != null
+                            )
+                            .map((target: Target) => {
+                                if (
+                                    site.type === "local" ||
+                                    site.type === "wireguard"
+                                ) {
+                                    return {
+                                        url: `${target.method}://${target.ip}:${target.port}`
+                                    };
+                                } else if (site.type === "newt") {
+                                    const ip = site.subnet.split("/")[0];
+                                    return {
+                                        url: `${target.method}://${ip}:${target.internalPort}`
+                                    };
+                                }
+                            })
                     }
                 };
             } else {
-                config_output[resource.protocol].routers[routerName] = {
-                    entryPoints: [`${resource.protocol}-${resource.proxyPort}`],
+                // Non-HTTP (TCP/UDP) configuration
+                const protocol = resource.protocol.toLowerCase();
+                const port = resource.proxyPort;
+
+                if (!port) {
+                    continue;
+                }
+
+                // Create dynamic entry point if it doesn't exist
+                if (!usedPorts.has(port)) {
+                    const entryPointName = `${protocol}-${port}`;
+                    config_output.entryPoints[entryPointName] = {
+                        address: `:${port}`,
+                        protocol: protocol.toUpperCase()
+                    };
+                    usedPorts.add(port);
+                }
+
+                const entryPointName = `${protocol}-${port}`;
+
+                config_output[protocol].routers[routerName] = {
+                    entryPoints: [entryPointName],
                     service: serviceName,
                     rule: "HostSNI(`*`)"
                 };
-                config_output[resource.protocol].services[serviceName] = {
+
+                config_output[protocol].services[serviceName] = {
                     loadBalancer: {
-                        servers: targets.map((target: Target) => {
-                            if (
-                                site.type === "local" ||
-                                site.type === "wireguard"
-                            ) {
-                                return {
-                                    address: `${target.ip}:${target.port}`
-                                };
-                            } else if (site.type === "newt") {
-                                const ip = site.subnet.split("/")[0];
-                                return {
-                                    address: `${ip}:${target.internalPort}`
-                                };
-                            }
-                        })
+                        servers: targets
+                            .filter(
+                                (target: Target) => target.internalPort != null
+                            )
+                            .map((target: Target) => {
+                                if (
+                                    site.type === "local" ||
+                                    site.type === "wireguard"
+                                ) {
+                                    return {
+                                        address: `${target.ip}:${target.port}`
+                                    };
+                                } else if (site.type === "newt") {
+                                    const ip = site.subnet.split("/")[0];
+                                    return {
+                                        address: `${ip}:${target.internalPort}`
+                                    };
+                                }
+                            })
                     }
                 };
             }
@@ -223,6 +256,12 @@ export async function traefikConfigProvider(
 
         // Only include non-empty configuration sections
         const finalConfig: any = {};
+
+        // Always include entryPoints if they exist
+        if (Object.keys(config_output.entryPoints).length > 0) {
+            finalConfig.entryPoints = config_output.entryPoints;
+        }
+
         for (const section of ["http", "tcp", "udp"]) {
             if (
                 Object.keys(config_output[section].routers).length > 0 ||
