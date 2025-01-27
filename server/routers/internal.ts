@@ -15,6 +15,7 @@ internalRouter.get("/", (_, res) => {
 });
 
 internalRouter.get("/traefik-config", traefik.traefikConfigProvider);
+
 internalRouter.get(
     "/resource-session/:resourceId/:token",
     auth.checkResourceSession

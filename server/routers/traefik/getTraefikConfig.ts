@@ -67,10 +67,7 @@ export async function traefikConfigProvider(
 
         // Initialize configuration with dynamic entryPoints
         const config_output: any = {
-            entryPoints: {},
             http: {
-                routers: {},
-                services: {},
                 middlewares: {
                     [badgerMiddlewareName]: {
                         plugin: {
@@ -96,23 +93,12 @@ export async function traefikConfigProvider(
                     },
                     [redirectHttpsMiddlewareName]: {
                         redirectScheme: {
-                            scheme: "https",
+                            scheme: "https"
                         }
                     }
                 }
-            },
-            tcp: {
-                routers: {},
-                services: {}
-            },
-            udp: {
-                routers: {},
-                services: {}
             }
         };
-
-        // Create a Set to track unique ports for TCP/UDP
-        const usedPorts = new Set<number>();
 
         for (const resource of allResources) {
             const targets = JSON.parse(resource.targets);
@@ -131,6 +117,23 @@ export async function traefikConfigProvider(
                 // HTTP configuration remains the same
                 if (!resource.subdomain) {
                     continue;
+                }
+
+                if (
+                    targets.filter(
+                        (target: Target) => target.internalPort != null
+                    ).length == 0
+                ) {
+                    continue;
+                }
+
+                // add routers and services empty objects if they don't exist
+                if (!config_output.http.routers) {
+                    config_output.http.routers = {};
+                }
+
+                if (!config_output.http.services) {
+                    config_output.http.services = {};
                 }
 
                 const domainParts = fullDomain.split(".");
@@ -209,22 +212,34 @@ export async function traefikConfigProvider(
                     continue;
                 }
 
-                // Create dynamic entry point if it doesn't exist
-                if (!usedPorts.has(port)) {
-                    const entryPointName = `${protocol}-${port}`;
-                    config_output.entryPoints[entryPointName] = {
-                        address: `:${port}`,
-                        protocol: protocol.toUpperCase()
+                if (
+                    targets.filter(
+                        (target: Target) => target.internalPort != null
+                    ).length == 0
+                ) {
+                    continue;
+                }
+
+                if (!config_output.entryPoints) {
+                    config_output.entryPoints = {};
+                }
+
+                if (!config_output[protocol]) {
+                    config_output[protocol] = {
+                        routers: {},
+                        services: {}
                     };
-                    usedPorts.add(port);
                 }
 
                 const entryPointName = `${protocol}-${port}`;
+                config_output.entryPoints[entryPointName] = {
+                    address: `:${port}`,
+                    protocol: protocol.toUpperCase()
+                };
 
                 config_output[protocol].routers[routerName] = {
                     entryPoints: [entryPointName],
-                    service: serviceName,
-                    rule: "HostSNI(`*`)"
+                    service: serviceName
                 };
 
                 config_output[protocol].services[serviceName] = {
@@ -252,27 +267,7 @@ export async function traefikConfigProvider(
                 };
             }
         }
-
-        // Only include non-empty configuration sections
-        const finalConfig: any = {};
-
-        // Always include entryPoints if they exist
-        if (Object.keys(config_output.entryPoints).length > 0) {
-            finalConfig.entryPoints = config_output.entryPoints;
-        }
-
-        for (const section of ["http", "tcp", "udp"]) {
-            if (
-                Object.keys(config_output[section].routers).length > 0 ||
-                Object.keys(config_output[section].services).length > 0 ||
-                (section === "http" &&
-                    Object.keys(config_output[section].middlewares).length > 0)
-            ) {
-                finalConfig[section] = config_output[section];
-            }
-        }
-
-        return res.status(HttpCode.OK).json(finalConfig);
+        return res.status(HttpCode.OK).json(config_output);
     } catch (e) {
         logger.error(`Failed to build traefik config: ${e}`);
         return res.status(HttpCode.INTERNAL_SERVER_ERROR).json({

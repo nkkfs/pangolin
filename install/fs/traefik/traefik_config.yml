@@ -4,7 +4,13 @@ api:
 
 providers:
   http:
-    endpoint: "http://pangolin:3001/api/v1/traefik-config"
+    endpoint: "http://pangolin:3001/api/v1/traefik-config/http"
+    pollInterval: "5s"
+  udp:
+    endpoint: "http://pangolin:3001/api/v1/traefik-config/udp"
+    pollInterval: "5s"
+  tcp:
+    endpoint: "http://pangolin:3001/api/v1/traefik-config/tcp"
     pollInterval: "5s"
   file:
     filename: "/etc/traefik/dynamic_config.yml"
