@@ -13,7 +13,7 @@ export async function verifyAdmin(
     const userId = req.user?.userId;
     const orgId = req.userOrgId;
 
-    if (!userId) {
+    if (!orgId) {
         return next(
             createHttpError(HttpCode.UNAUTHORIZED, "User does not have orgId")
         );
