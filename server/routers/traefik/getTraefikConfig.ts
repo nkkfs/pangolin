@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import db from "@server/db";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import logger from "@server/logger";
 import HttpCode from "@server/types/HttpCode";
 import config from "@server/lib/config";
@@ -97,7 +97,6 @@ export async function traefikConfigProvider(
                     [redirectHttpsMiddlewareName]: {
                         redirectScheme: {
                             scheme: "https",
-                            permanent: true
                         }
                     }
                 }
