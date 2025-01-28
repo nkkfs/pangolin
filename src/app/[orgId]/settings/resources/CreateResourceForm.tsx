@@ -60,34 +60,39 @@ import {
     SelectValue
 } from "@app/components/ui/select";
 
-const createResourceFormSchema = z.object({
-    subdomain: z.union([
-        z.string()
-            .regex(
-                /^(?!:\/\/)([a-zA-Z0-9-_]+\.)*[a-zA-Z0-9-_]+$/,
-                "Invalid subdomain format"
-            )
-            .min(1, "Subdomain must be at least 1 character long")
-            .transform((val) => val.toLowerCase()),
-        z.string().optional()
-    ]).optional(),
-    name: z.string().min(1).max(255),
-    siteId: z.number(),
-    http: z.boolean(),
-    protocol: z.string(),
-    proxyPort: z.number().int().min(1).max(65535).optional(),
-}).refine(
-    (data) => {
-        if (data.http === true) {
-            return true;
+const createResourceFormSchema = z
+    .object({
+        subdomain: z
+            .union([
+                z
+                    .string()
+                    .regex(
+                        /^(?!:\/\/)([a-zA-Z0-9-_]+\.)*[a-zA-Z0-9-_]+$/,
+                        "Invalid subdomain format"
+                    )
+                    .min(1, "Subdomain must be at least 1 character long")
+                    .transform((val) => val.toLowerCase()),
+                z.string().optional()
+            ])
+            .optional(),
+        name: z.string().min(1).max(255),
+        siteId: z.number(),
+        http: z.boolean(),
+        protocol: z.string(),
+        proxyPort: z.number().int().min(1).max(65535).optional()
+    })
+    .refine(
+        (data) => {
+            if (data.http === true) {
+                return true;
+            }
+            return !!data.proxyPort;
+        },
+        {
+            message: "Port number is required for non-HTTP resources",
+            path: ["proxyPort"]
         }
-        return !!data.proxyPort;
-    },
-    {
-        message: "Port number is required for non-HTTP resources",
-        path: ["proxyPort"]
-    }
-);
+    );
 
 type CreateResourceFormValues = z.infer<typeof createResourceFormSchema>;
 
@@ -111,6 +116,7 @@ export default function CreateResourceForm({
     const router = useRouter();
 
     const { org } = useOrgContext();
+    const { env } = useEnvContext();
 
     const [sites, setSites] = useState<ListSitesResponse["sites"]>([]);
     const [domainSuffix, setDomainSuffix] = useState<string>(org.org.domain);
@@ -152,7 +158,7 @@ export default function CreateResourceForm({
                 `/org/${orgId}/site/${data.siteId}/resource/`,
                 {
                     name: data.name,
-                    subdomain: data.http ? data.subdomain: undefined,
+                    subdomain: data.http ? data.subdomain : undefined,
                     http: data.http,
                     protocol: data.protocol,
                     proxyPort: data.http ? undefined : data.proxyPort
@@ -222,33 +228,37 @@ export default function CreateResourceForm({
                                         </FormItem>
                                     )}
                                 />
-                                <FormField
-                                    control={form.control}
-                                    name="http"
-                                    render={({ field }) => (
-                                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                                            <div className="space-y-0.5">
-                                                <FormLabel className="text-base">
-                                                    HTTP Resource
-                                                </FormLabel>
-                                                <FormDescription>
-                                                    Toggle if this is an HTTP
-                                                    resource or a raw TCP/UDP resource
-                                                </FormDescription>
-                                            </div>
-                                            <FormControl>
-                                                <Switch
-                                                    checked={field.value}
-                                                    onCheckedChange={
-                                                        field.onChange
-                                                    }
-                                                />
-                                            </FormControl>
-                                        </FormItem>
-                                    )}
-                                />
 
-                            {form.watch("http") && (
+                                {!env.flags.allowRawResources || (
+                                    <FormField
+                                        control={form.control}
+                                        name="http"
+                                        render={({ field }) => (
+                                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                                <div className="space-y-0.5">
+                                                    <FormLabel className="text-base">
+                                                        HTTP Resource
+                                                    </FormLabel>
+                                                    <FormDescription>
+                                                        Toggle if this is an
+                                                        HTTP resource or a raw
+                                                        TCP/UDP resource
+                                                    </FormDescription>
+                                                </div>
+                                                <FormControl>
+                                                    <Switch
+                                                        checked={field.value}
+                                                        onCheckedChange={
+                                                            field.onChange
+                                                        }
+                                                    />
+                                                </FormControl>
+                                            </FormItem>
+                                        )}
+                                    />
+                                )}
+
+                                {form.watch("http") && (
                                     <FormField
                                         control={form.control}
                                         name="subdomain"
@@ -257,7 +267,9 @@ export default function CreateResourceForm({
                                                 <FormLabel>Subdomain</FormLabel>
                                                 <FormControl>
                                                     <CustomDomainInput
-                                                        value={field.value ?? ""}
+                                                        value={
+                                                            field.value ?? ""
+                                                        }
                                                         domainSuffix={
                                                             domainSuffix
                                                         }
@@ -331,7 +343,10 @@ export default function CreateResourceForm({
                                                         <Input
                                                             type="number"
                                                             placeholder="Enter port number"
-                                                            value={field.value ?? ''}
+                                                            value={
+                                                                field.value ??
+                                                                ""
+                                                            }
                                                             onChange={(e) =>
                                                                 field.onChange(
                                                                     e.target

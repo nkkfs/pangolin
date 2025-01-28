@@ -54,3 +54,4 @@ flags:
     require_email_verification: {{.EnableEmail}}
     disable_signup_without_invite: {{.DisableSignupWithoutInvite}}
     disable_user_create_org: {{.DisableUserCreateOrg}}
+    allow_raw_resources: true

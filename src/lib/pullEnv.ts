@@ -26,7 +26,9 @@ export function pullEnv(): Env {
             emailVerificationRequired:
                 process.env.FLAGS_EMAIL_VERIFICATION_REQUIRED === "true"
                     ? true
-                    : false
+                    : false,
+            allowRawResources:
+                process.env.FLAGS_ALLOW_RAW_RESOURCES === "true" ? true : false,
         }
     };
 }

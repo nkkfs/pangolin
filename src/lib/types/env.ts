@@ -17,5 +17,6 @@ export type Env = {
         disableSignupWithoutInvite: boolean;
         disableUserCreateOrg: boolean;
         emailVerificationRequired: boolean;
+        allowRawResources: boolean;
     }
 };
