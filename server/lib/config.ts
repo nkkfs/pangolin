@@ -122,10 +122,11 @@ const configSchema = z.object({
     }),
     email: z
         .object({
-            smtp_host: z.string(),
-            smtp_port: portSchema,
-            smtp_user: z.string(),
-            smtp_pass: z.string(),
+            smtp_host: z.string().optional(),
+            smtp_port: portSchema.optional(),
+            smtp_user: z.string().optional(),
+            smtp_pass: z.string().optional(),
+            smtp_secure: z.boolean().optional(),
             no_reply: z.string().email()
         })
         .optional(),

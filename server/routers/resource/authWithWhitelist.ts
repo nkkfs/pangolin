@@ -13,9 +13,7 @@ import { NextFunction, Request, Response } from "express";
 import createHttpError from "http-errors";
 import { z } from "zod";
 import { fromError } from "zod-validation-error";
-import {
-    createResourceSession,
-} from "@server/auth/sessions/resource";
+import { createResourceSession } from "@server/auth/sessions/resource";
 import { isValidOtp, sendResourceOtpEmail } from "@server/auth/resourceOtp";
 import logger from "@server/logger";
 
@@ -90,20 +88,48 @@ export async function authWithWhitelist(
             .leftJoin(orgs, eq(orgs.orgId, resources.orgId))
             .limit(1);
 
-        const resource = result?.resources;
-        const org = result?.orgs;
-        const whitelistedEmail = result?.resourceWhitelist;
+        let resource = result?.resources;
+        let org = result?.orgs;
+        let whitelistedEmail = result?.resourceWhitelist;
 
         if (!whitelistedEmail) {
-            return next(
-                createHttpError(
-                    HttpCode.UNAUTHORIZED,
-                    createHttpError(
-                        HttpCode.BAD_REQUEST,
-                        "Email is not whitelisted"
+            // if email is not found, check for wildcard email
+            const wildcard = "*@" + email.split("@")[1];
+
+            logger.debug("Checking for wildcard email: " + wildcard)
+
+            const [result] = await db
+                .select()
+                .from(resourceWhitelist)
+                .where(
+                    and(
+                        eq(resourceWhitelist.resourceId, resourceId),
+                        eq(resourceWhitelist.email, wildcard)
                     )
                 )
-            );
+                .leftJoin(
+                    resources,
+                    eq(resources.resourceId, resourceWhitelist.resourceId)
+                )
+                .leftJoin(orgs, eq(orgs.orgId, resources.orgId))
+                .limit(1);
+
+            resource = result?.resources;
+            org = result?.orgs;
+            whitelistedEmail = result?.resourceWhitelist;
+
+            // if wildcard is still not found, return unauthorized
+            if (!whitelistedEmail) {
+                return next(
+                    createHttpError(
+                        HttpCode.UNAUTHORIZED,
+                        createHttpError(
+                            HttpCode.BAD_REQUEST,
+                            "Email is not whitelisted"
+                        )
+                    )
+                );
+            }
         }
 
         if (!org) {

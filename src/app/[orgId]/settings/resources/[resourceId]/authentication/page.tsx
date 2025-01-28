@@ -48,6 +48,7 @@ import {
     SettingsSectionFooter
 } from "@app/components/Settings";
 import { SwitchInput } from "@app/components/SwitchInput";
+import { InfoPopup } from "@app/components/ui/info-popup";
 
 const UsersRolesFormSchema = z.object({
     roles: z.array(
@@ -665,10 +666,12 @@ export default function ResourceAuthenticationPage() {
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormLabel>
-                                                        Whitelisted Emails
+                                                        <InfoPopup
+                                                            text="Whitelisted Emails"
+                                                            info="Only users with these email addresses will be able to access this resource. They will be prompted to enter a one-time password sent to their email. Wildcards (*@example.com) can be used to allow any email address from a domain."
+                                                        />
                                                     </FormLabel>
                                                     <FormControl>
-                                                        {/* @ts-ignore */}
                                                         {/* @ts-ignore */}
                                                         <TagInput
                                                             {...field}
@@ -681,6 +684,17 @@ export default function ResourceAuthenticationPage() {
                                                                 return z
                                                                     .string()
                                                                     .email()
+                                                                    .or(
+                                                                        z
+                                                                            .string()
+                                                                            .regex(
+                                                                                /^\*@[\w.-]+\.[a-zA-Z]{2,}$/,
+                                                                                {
+                                                                                    message:
+                                                                                        "Invalid email address. Wildcard (*) must be the entire local part."
+                                                                                }
+                                                                            )
+                                                                    )
                                                                     .safeParse(
                                                                         tag
                                                                     ).success;

@@ -12,7 +12,17 @@ import { and, eq } from "drizzle-orm";
 const setResourceWhitelistBodySchema = z
     .object({
         emails: z
-            .array(z.string().email())
+            .array(
+                z
+                    .string()
+                    .email()
+                    .or(
+                        z.string().regex(/^\*@[\w.-]+\.[a-zA-Z]{2,}$/, {
+                            message:
+                                "Invalid email address. Wildcard (*) must be the entire local part."
+                        })
+                    )
+            )
             .max(50)
             .transform((v) => v.map((e) => e.toLowerCase()))
     })
