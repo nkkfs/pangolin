@@ -49,7 +49,7 @@ const updateTargetParamsSchema = z
 const updateTargetBodySchema = z
     .object({
         ip: domainSchema.optional(),
-        method: z.string().min(1).max(10).optional(),
+        method: z.string().min(1).max(10).optional().nullable(),
         port: z.number().int().min(1).max(65535).optional(),
         enabled: z.boolean().optional()
     })

@@ -65,7 +65,6 @@ export async function traefikConfigProvider(
         const badgerMiddlewareName = "badger";
         const redirectHttpsMiddlewareName = "redirect-to-https";
 
-        // Initialize configuration with dynamic entryPoints
         const config_output: any = {
             http: {
                 middlewares: {
@@ -220,10 +219,6 @@ export async function traefikConfigProvider(
                     continue;
                 }
 
-                if (!config_output.entryPoints) {
-                    config_output.entryPoints = {};
-                }
-
                 if (!config_output[protocol]) {
                     config_output[protocol] = {
                         routers: {},
@@ -231,15 +226,10 @@ export async function traefikConfigProvider(
                     };
                 }
 
-                const entryPointName = `${protocol}-${port}`;
-                config_output.entryPoints[entryPointName] = {
-                    address: `:${port}`,
-                    protocol: protocol.toUpperCase()
-                };
-
                 config_output[protocol].routers[routerName] = {
-                    entryPoints: [entryPointName],
-                    service: serviceName
+                    entryPoints: [`${protocol}-${port}`],
+                    service: serviceName,
+                    ...(protocol === "tcp" ? { rule: "HostSNI(`*`)" } : {})
                 };
 
                 config_output[protocol].services[serviceName] = {

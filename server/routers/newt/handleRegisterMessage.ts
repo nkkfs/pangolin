@@ -7,7 +7,7 @@ import {
     Target,
     targets
 } from "@server/db/schema";
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { addPeer, deletePeer } from "../gerbil/peers";
 import logger from "@server/logger";
 
@@ -90,15 +90,22 @@ export const handleRegisterMessage: MessageHandler = async (context) => {
             protocol: resources.protocol,
             // Targets as a subquery
             targets: sql<string>`json_group_array(json_object(
-              'targetId', ${targets.targetId},
-              'ip', ${targets.ip},
-              'method', ${targets.method},
-              'port', ${targets.port},
-              'internalPort', ${targets.internalPort},
-              'enabled', ${targets.enabled}
-            ))`.as("targets")
+          'targetId', ${targets.targetId},
+          'ip', ${targets.ip},
+          'method', ${targets.method},
+          'port', ${targets.port},
+          'internalPort', ${targets.internalPort},
+          'enabled', ${targets.enabled}
+        ))`.as("targets")
         })
         .from(resources)
+        .leftJoin(
+            targets,
+            and(
+                eq(targets.resourceId, resources.resourceId),
+                eq(targets.enabled, true)
+            )
+        )
         .groupBy(resources.resourceId);
 
     let tcpTargets: string[] = [];
@@ -106,6 +113,9 @@ export const handleRegisterMessage: MessageHandler = async (context) => {
 
     for (const resource of allResources) {
         const targets = JSON.parse(resource.targets);
+        if (!targets || targets.length === 0) {
+            continue;
+        }
         if (resource.protocol === "tcp") {
             tcpTargets = tcpTargets.concat(
                 targets.map(
